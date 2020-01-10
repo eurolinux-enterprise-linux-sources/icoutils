@@ -1,4 +1,18 @@
-????-??-??: icoutils 0.31.0 released.
+2017-03-11: icoutils 0.31.3 released.
+  Warning fixes and build improvements from Richard W.M. Jones <rjones@redhat.com>
+  Fixed wrestool being broken. Reported by Richard W.M. Jones <rjones@redhat.com>
+
+2017-03-06: icoutils 0.31.2 released.
+  Various security fixes from Martin Gieseking,
+  issues found by Jerzy Kramarz
+  (CVE-2017-6009, CVE-2017-6010, CVE-2017-6011).
+
+2017-01-08: icoutils 0.31.1 released.
+  Security fixes:
+    Colin Watson, Debian bug #850017
+    Martin Gieseking, Fedora bug #1249276
+
+2013-05-19: icoutils 0.31.0 released.
   Change placement of libintl dependency.
    Fixes build issues with external libintl (e.g. MinGW). (Sebastián Puebla)
   Solaris build fixes. (Mats Erik Andersson)

@@ -15,7 +15,7 @@ icotool_LDADD = \
   @PNG_LIBS@ \
   ../common/libcommon.a \
   ../lib/libgnu.a \
-  @INTLLIBS@
+  @LIBINTL@
 
 man_MANS = \
   icotool.1
@@ -28,4 +28,4 @@ AM_CPPFLAGS = \
   -I$(top_srcdir)/lib \
   -I$(top_srcdir)
 
-AM_CFLAGS = -Wall
+AM_CFLAGS = $(WARN_CFLAGS) $(WERROR_CFLAGS)

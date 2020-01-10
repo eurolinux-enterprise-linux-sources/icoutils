@@ -13,7 +13,7 @@ wrestool_SOURCES = \
 wrestool_LDADD = \
   ../common/libcommon.a \
   ../lib/libgnu.a \
-  @INTLLIBS@
+  @LIBINTL@
 
 man_MANS = \
   wrestool.1
@@ -27,4 +27,4 @@ AM_CPPFLAGS = \
   -I$(top_srcdir) \
   -I$(srcdir)/../icotool
 
-AM_CFLAGS = -Wall
+AM_CFLAGS = $(WARN_CFLAGS) $(WERROR_CFLAGS)

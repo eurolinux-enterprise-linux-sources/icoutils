@@ -58,7 +58,7 @@ if ($arg_help) {
 	exit;
 }
 if ($arg_version) {
-	print "$PROGRAM (icoutils) 0.31.0\n";
+	print "$PROGRAM (icoutils) 0.31.3\n";
 	print "Written by Oskar Liljeblad.\n\n";
 	print "Copyright (C) 1998-2005 Oskar Liljeblad.\n";
 	print "This is free software; see the source for copying conditions.  There is NO\n";

@@ -21,6 +21,7 @@
 #include <stdint.h>		/* POSIX/Gnulib */
 #include <stdlib.h>		/* C89 */
 #include <stdio.h>		/* C89 */
+#include <inttypes.h>
 #if HAVE_PNG_H
 # include <png.h>
 #else
@@ -94,7 +95,7 @@ static void png_read_mem (png_structp png, png_bytep data, png_size_t size)
 
 
 int
-extract_icons(FILE *in, char *inname, bool listmode, ExtractNameGen outfile_gen, ExtractFilter filter)
+extract_icons(FILE *in, const char *inname, bool listmode, ExtractNameGen outfile_gen, ExtractFilter filter)
 {
 	Win32CursorIconFileDir dir;
 	Win32CursorIconFileDirEntry *entries = NULL;
@@ -138,7 +139,8 @@ extract_icons(FILE *in, char *inname, bool listmode, ExtractNameGen outfile_gen,
 				Win32RGBQuad *palette = NULL;
 				uint32_t palette_count = 0;
 				uint32_t image_size, mask_size;
-				uint32_t width, height, bit_count;
+				int32_t width, height;
+				uint32_t bit_count;
 				uint8_t *image_data = NULL, *mask_data = NULL;
 				png_structp png_ptr = NULL;
 				png_infop info_ptr = NULL;
@@ -154,16 +156,23 @@ extract_icons(FILE *in, char *inname, bool listmode, ExtractNameGen outfile_gen,
 				/* Vista icon: it's just a raw PNG */
 				if (bitmap.size == ICO_PNG_MAGIC)
 				{
+					uint32_t unsigned_width, unsigned_height;
 					fseek(in, offset, SEEK_SET);
 				
 					image_size = entries[c].dib_size;
 					image_data = xmalloc(image_size);
 					if (!xfread(image_data, image_size, in))
 						goto done;
-					
-					if (!read_png (image_data, image_size, &bit_count, &width, &height))
+
+					if (!read_png (image_data, image_size, &bit_count, &unsigned_width, &unsigned_height))
 						goto done;
-					
+
+					width = (int32_t)unsigned_width;
+					height = (int32_t)unsigned_height;
+					if ((bitmap.width > INT32_MAX/4) || (bitmap.height > INT32_MAX)) {
+						warn(_("PNG too large"));
+						goto done;
+					}
 					completed++;
 					
 					if (!filter(completed, width, height, bitmap.bit_count, palette_count, dir.type == 1,
@@ -175,15 +184,14 @@ extract_icons(FILE *in, char *inname, bool listmode, ExtractNameGen outfile_gen,
 					matched++;
 
 					if (listmode) {
-						printf(_("--%s --index=%d --width=%d --height=%d --bit-depth=%d --palette-size=%d"),
+						printf(_("--%s --index=%d --width=%d --height=%d --bit-depth=%" PRIu32 " --palette-size=%" PRIu32),
 								(dir.type == 1 ? "icon" : "cursor"), completed, width, height,
 								bit_count, palette_count);
 						if (dir.type == 2)
 							printf(_(" --hotspot-x=%d --hotspot-y=%d"), entries[c].hotspot_x, entries[c].hotspot_y);
 						printf("\n");
 					} else {
-						outname = inname;
-						out = outfile_gen(&outname, width, height, bit_count, completed);
+						out = outfile_gen(inname, &outname, width, height, bit_count, completed);
 						restore_message_header();
 						set_message_header(outname);
 
@@ -228,11 +236,19 @@ extract_icons(FILE *in, char *inname, bool listmode, ExtractNameGen outfile_gen,
 					offset += bitmap.size;
 
 					if (bitmap.clr_used != 0 || bitmap.bit_count < 24) {
-						palette_count = (bitmap.clr_used != 0 ? bitmap.clr_used : 1 << bitmap.bit_count);
+						palette_count = (bitmap.clr_used != 0 ? bitmap.clr_used : (uint32_t) (1 << bitmap.bit_count));
+						if (palette_count > 256) {
+							warn(_("palette too large"));
+							goto done;
+						}
 						palette = xmalloc(sizeof(Win32RGBQuad) * palette_count);
 						if (!xfread(palette, sizeof(Win32RGBQuad) * palette_count, in))
 							goto done;
 						offset += sizeof(Win32RGBQuad) * palette_count;
+					}
+					if (abs(bitmap.width) > INT32_MAX/max(4, bitmap.bit_count)) {
+						warn(_("bitmap width too large"));
+						goto done;
 					}
 
 					width = bitmap.width;
@@ -279,8 +295,7 @@ extract_icons(FILE *in, char *inname, bool listmode, ExtractNameGen outfile_gen,
 							goto done;
 						}
 
-						outname = inname;
-						out = outfile_gen(&outname, width, height, bitmap.bit_count, completed);
+						out = outfile_gen(inname, &outname, width, height, bitmap.bit_count, completed);
 						restore_message_header();
 						set_message_header(outname);
 
@@ -303,13 +318,13 @@ extract_icons(FILE *in, char *inname, bool listmode, ExtractNameGen outfile_gen,
 
 					row = xmalloc(width * 4);
 
-					for (d = 0; d < height; d++) {
+					for (d = 0; d < (uint32_t) height; d++) {
 						uint32_t x;
 						uint32_t y = (bitmap.height < 0 ? d : height - d - 1);
 						uint32_t imod = y * (image_size / height) * 8 / bitmap.bit_count;
 						uint32_t mmod = y * (mask_size / height) * 8;
 
-						for (x = 0; x < width; x++) {
+						for (x = 0; x < (uint32_t) width; x++) {
 							uint32_t color = simple_vec(image_data, x + imod, bitmap.bit_count);
 
 							if (bitmap.bit_count <= 16) {
@@ -336,7 +351,7 @@ extract_icons(FILE *in, char *inname, bool listmode, ExtractNameGen outfile_gen,
 					}
 
 					if (listmode) {
-						printf(_("--%s --index=%d --width=%d --height=%d --bit-depth=%d --palette-size=%d"),
+						printf(_("--%s --index=%d --width=%d --height=%d --bit-depth=%" PRIu32 " --palette-size=%" PRIu32),
 								(dir.type == 1 ? "icon" : "cursor"), completed, width, height,
 								bitmap.bit_count, palette_count);
 						if (dir.type == 2)

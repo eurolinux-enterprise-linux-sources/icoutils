@@ -66,7 +66,7 @@ xfread(void *ptr, size_t size, FILE *stream)
 }
 
 bool
-create_icon(int filec, char **filev, int raw_filec, char** raw_filev, CreateNameGen outfile_gen, bool icon_mode, int32_t hotspot_x, int32_t hotspot_y, int32_t alpha_threshold, int32_t bit_count)
+create_icon(size_t filec, char **filev, size_t raw_filec, char** raw_filev, CreateNameGen outfile_gen, bool icon_mode, int32_t hotspot_x, int32_t hotspot_y, int32_t alpha_threshold, int32_t bit_count)
 {
 	struct {
 		FILE *in;
@@ -87,10 +87,11 @@ create_icon(int filec, char **filev, int raw_filec, char** raw_filev, CreateName
 	Win32CursorIconFileDir dir;
 	FILE *out;
 	char *outname = NULL;
-	uint32_t c, d, x;
+	size_t c;
+	uint32_t d, x;
 	uint32_t dib_start;
 	png_byte ct;
-	int org_filec = filec;
+	size_t org_filec = filec;
 	
 	filec += raw_filec;
 
@@ -221,7 +222,7 @@ create_icon(int filec, char **filev, int raw_filec, char** raw_filev, CreateName
 				img[c].palette_count = 0;
 			}
 			else if (palette_count(img[c].palette) <= 256) {
-				for (d = 1; palette_count(img[c].palette) > 1 << d; d <<= 1);
+				for (d = 1; palette_count(img[c].palette) > (uint32_t)(1 << d); d <<= 1);
 				if (d == 2)	/* four colors (two bits) are not supported */
 					d = 4;
 				img[c].bit_count = d;
@@ -234,9 +235,9 @@ create_icon(int filec, char **filev, int raw_filec, char** raw_filev, CreateName
 
 			/* Does the user want to change number of bits per pixel? */
 			if (bit_count != -1) {
-				if (img[c].bit_count == bit_count) {
+				if (img[c].bit_count == (uint32_t) bit_count) {
 					/* No operation */
-				} else if (img[c].bit_count < bit_count) {
+				} else if (img[c].bit_count < (uint32_t) bit_count) {
 					img[c].bit_count = bit_count;
 					img[c].palette_count = (bit_count > 16 ? 0 : 1 << bit_count);
 				} else {
@@ -356,7 +357,7 @@ create_icon(int filec, char **filev, int raw_filec, char** raw_filev, CreateName
 				 * programs that read icons assume it. Especially gdk-pixbuf.
 				 */
 			    	memset(&color, 0, sizeof(Win32RGBQuad));
-				for (d = palette_count(img[c].palette); d < 1 << img[c].bit_count; d++)
+				for (d = palette_count(img[c].palette); d < (uint32_t) (1 << img[c].bit_count); d++)
 					fwrite(&color, sizeof(Win32RGBQuad), 1, out);
 			}
 

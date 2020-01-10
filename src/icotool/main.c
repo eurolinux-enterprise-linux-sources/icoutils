@@ -66,7 +66,7 @@ enum {
     CURSOR_OPT,
 };
 
-static char *short_opts = "xlco:i:w:h:p:b:X:Y:t:r:";
+static const char *short_opts = "xlco:i:w:h:p:b:X:Y:t:r:";
 static struct option long_opts[] = {
     { "extract",		no_argument,    	NULL, 'x' },
     { "list",			no_argument,		NULL, 'l' },
@@ -127,13 +127,11 @@ create_outfile_gen(char **out)
 }
 
 static FILE *
-extract_outfile_gen(char **outname_ptr, int w, int h, int bc, int i)
+extract_outfile_gen(const char *inname, char **outname_ptr, int w, int h, int bc, int i)
 {
-    char *inname = *outname_ptr;
-
     if (output == NULL || is_directory(output)) {
 	StrBuf *outname;
-	char *inbase;
+	const char *inbase;
 
 	outname = strbuf_new();
 	if (output != NULL) {
@@ -192,7 +190,7 @@ display_help(void)
 }
 
 static bool
-open_file_or_stdin(char *name, FILE **outfile, char **outname)
+open_file_or_stdin(char *name, FILE **outfile, const char **outname)
 {
     if (strcmp(name, "-") == 0) {
         *outfile = stdin;
@@ -216,8 +214,8 @@ main(int argc, char **argv)
     bool extract_mode = false;
     bool create_mode = false;
     FILE *in;
-    char *inname;
-    int raw_filec = 0;
+    const char *inname;
+    size_t raw_filec = 0;
     char** raw_filev = 0;
 
     set_program_name(argv[0]);

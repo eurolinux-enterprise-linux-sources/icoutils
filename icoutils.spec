@@ -1,9 +1,8 @@
 Name:           icoutils
-Version:        0.31.0
-Release:        3%{?dist}
+Version:        0.31.3
+Release:        1%{?dist}
 Summary:        Utility for extracting and converting Microsoft icon and cursor files
 
-Group:          Applications/Multimedia
 License:        GPLv3+
 URL:            http://www.nongnu.org/icoutils/
 Source0:        http://savannah.nongnu.org/download/%{name}/%{name}-%{version}.tar.bz2
@@ -24,7 +23,8 @@ libraries.
 
 %prep
 %setup -q
-autoreconf
+
+autoreconf -i
 
 for f in AUTHORS NEWS; do
   iconv -f ISO88592 -t UTF8 < $f > $f.utf8 && \
@@ -52,6 +52,13 @@ make install DESTDIR=%{buildroot}
 
 
 %changelog
+* Tue Mar 14 2017 Richard W.M. Jones <rjones@redhat.com> - 0.31.3-1
+- Rebase to upstream version 0.31.3.
+- This version includes multiple security fixes
+  CVE-2017-5208, CVE-2017-5333, CVE-2017-5332, CVE-2017-6009,
+  CVE-2017-6010, CVE-2017-6011
+  resolves: rhbz#1430610
+
 * Fri Jan 24 2014 Daniel Mach <dmach@redhat.com> - 0.31.0-3
 - Mass rebuild 2014-01-24
 

@@ -35,18 +35,25 @@ static WinResource *list_ne_type_resources (WinLibrary *, int *);
 static WinResource *list_ne_name_resources (WinLibrary *, WinResource *, int *);
 static WinResource *list_pe_resources (WinLibrary *, Win32ImageResourceDirectory *, int, int *);
 static int calc_vma_size (WinLibrary *);
-static void do_resources_recurs (WinLibrary *, WinResource *, WinResource *, WinResource *, WinResource *, char *, char *, char *, DoResourceCallback);
+static void do_resources_recurs (WinLibrary *, WinResource *, WinResource *, WinResource *, WinResource *, const char *, const char *, const char *, DoResourceCallback);
 static char *get_resource_id_quoted (WinResource *);
-static WinResource *find_with_resource_array(WinLibrary *, WinResource *, char *);
+static WinResource *find_with_resource_array(WinLibrary *, WinResource *, const char *);
 static WinResource *list_resources (WinLibrary *fi, WinResource *res, int *count);
-static bool compare_resource_id (WinResource *wr, char *id);
+static bool compare_resource_id (WinResource *wr, const char *id);
+
+/* Check whether access to a PE_SECTIONS is allowed */
+#define RETURN_IF_BAD_PE_SECTIONS(ret, module)                                              \
+    do {                                                                                    \
+        RETURN_IF_BAD_POINTER(ret, PE_HEADER(module)->optional_header);                     \
+        RETURN_IF_BAD_POINTER(ret, PE_HEADER(module)->file_header.size_of_optional_header); \
+    } while(0)
 
 /* do_resources:
  *   Do something for each resource matching type, name and lang.
  */
 
 void
-do_resources (WinLibrary *fi, char *type, char *name, char *lang, DoResourceCallback cb)
+do_resources (WinLibrary *fi, const char *type, const char *name, const char *lang, DoResourceCallback cb)
 {
 	WinResource *type_wr;
 	WinResource *name_wr;
@@ -70,8 +77,8 @@ do_resources (WinLibrary *fi, char *type, char *name, char *lang, DoResourceCall
 
 static void
 do_resources_recurs (WinLibrary *fi, WinResource *base, WinResource *type_wr,
-                          WinResource *name_wr, WinResource *lang_wr,
-						  char *type, char *name, char *lang, DoResourceCallback cb)
+                     WinResource *name_wr, WinResource *lang_wr,
+                     const char *type, const char *name, const char *lang, DoResourceCallback cb)
 {
 	int c, rescnt;
 	WinResource *wr;
@@ -105,8 +112,9 @@ print_resources_callback (WinLibrary *fi, WinResource *wr,
                           WinResource *type_wr, WinResource *name_wr,
 						  WinResource *lang_wr)
 {
-	char *type, *offset;
-	int32_t id, size;
+	const char *type, *offset;
+	int32_t id;
+	size_t size;
 
 	/* get named resource type if possible */
 	type = NULL;
@@ -118,7 +126,7 @@ print_resources_callback (WinLibrary *fi, WinResource *wr,
 	if (offset == NULL)
 		return;
 
-	printf(_("--type=%s --name=%s%s%s [%s%s%soffset=0x%x size=%d]\n"),
+	printf(_("--type=%s --name=%s%s%s [%s%s%soffset=0x%x size=%zu]\n"),
 	  get_resource_id_quoted(type_wr),
 	  get_resource_id_quoted(name_wr),
 	  (lang_wr->id[0] != '\0' ? _(" --language=") : ""),
@@ -143,7 +151,7 @@ get_resource_id_quoted (WinResource *wr)
 }
 
 static bool
-compare_resource_id (WinResource *wr, char *id)
+compare_resource_id (WinResource *wr, const char *id)
 {
 	if (wr->numeric_id) {
 		int32_t cmp1, cmp2;
@@ -184,7 +192,7 @@ decode_pe_resource_id (WinLibrary *fi, WinResource *wr, uint32_t value)
 		wr->id[len] = '\0';
 	} else {					/* Unicode string id */
 		/* translate id into a string */
-		snprintf(wr->id, WINRES_ID_MAXLEN, "%d", value);
+		snprintf(wr->id, WINRES_ID_MAXLEN, "%" PRIu32, value);
 	}
 
 	wr->numeric_id = (value & IMAGE_RESOURCE_NAME_IS_STRING ? false:true);
@@ -192,7 +200,7 @@ decode_pe_resource_id (WinLibrary *fi, WinResource *wr, uint32_t value)
 }
  
 void *
-get_resource_entry (WinLibrary *fi, WinResource *wr, int *size)
+get_resource_entry (WinLibrary *fi, WinResource *wr, size_t *size)
 {
 	if (fi->is_PE_binary) {
 		Win32ImageResourceDataEntry *dataent;
@@ -223,7 +231,7 @@ decode_ne_resource_id (WinLibrary *fi, WinResource *wr, uint16_t value)
 		/* translate id into a string */
 		snprintf(wr->id, WINRES_ID_MAXLEN, "%d", value & ~NE_RESOURCE_NAME_IS_NUMERIC);
 	} else {					/* ASCII string id */
-		int len;
+		unsigned char len;
 		char *mem = (char *) NE_HEADER(fi->memory)
 		                     + NE_HEADER(fi->memory)->rsrctab
 		                     + value;
@@ -306,7 +314,7 @@ list_ne_name_resources (WinLibrary *fi, WinResource *typeres, int *count)
 static WinResource *
 list_ne_type_resources (WinLibrary *fi, int *count)
 {
-	int c, rescnt;
+	size_t c, rescnt;
 	WinResource *wr;
 	Win16NETypeInfo *typeinfo;
 
@@ -388,6 +396,7 @@ read_library (WinLibrary *fi)
 		/* falls through */
 	}
 
+	RETURN_IF_BAD_OFFSET(false, MZ_HEADER(fi->memory), sizeof(Win32ImageNTHeaders));
 	/* check for OS2 (Win16) header signature `NE' */
 	RETURN_IF_BAD_POINTER(false, NE_HEADER(fi->memory)->magic);
 	if (NE_HEADER(fi->memory)->magic == IMAGE_OS2_SIGNATURE) {
@@ -419,7 +428,7 @@ read_library (WinLibrary *fi)
 
 		/* allocate new memory */
 		fi->total_size = calc_vma_size(fi);
-		if (fi->total_size == 0) {
+		if (fi->total_size <= 0) {
 			/* calc_vma_size has reported error */
 			return false;
 		}
@@ -427,7 +436,8 @@ read_library (WinLibrary *fi)
 
 		/* relocate memory, start from last section */
 		pe_header = PE_HEADER(fi->memory);
-		RETURN_IF_BAD_POINTER(false, pe_header->file_header.number_of_sections);
+        RETURN_IF_BAD_POINTER(false, pe_header->file_header.number_of_sections);
+        RETURN_IF_BAD_PE_SECTIONS(false, fi->memory);
 
 		/* we don't need to do OFFSET checking for the sections.
 		 * calc_vma_size has already done that */
@@ -474,7 +484,7 @@ static int
 calc_vma_size (WinLibrary *fi)
 {
     Win32ImageSectionHeader *seg;
-    int c, segcount, size;
+    size_t c, segcount, size;
 
     size = 0;
     RETURN_IF_BAD_POINTER(-1, PE_HEADER(fi->memory)->file_header.number_of_sections);
@@ -487,6 +497,7 @@ calc_vma_size (WinLibrary *fi)
     if (segcount == 0)
     	return fi->total_size;
 
+    RETURN_IF_BAD_PE_SECTIONS(-1, fi->memory);
     seg = PE_SECTIONS(fi->memory);
     RETURN_IF_BAD_POINTER(-1, *seg);
     
@@ -503,7 +514,7 @@ calc_vma_size (WinLibrary *fi)
 }
 
 static WinResource *
-find_with_resource_array(WinLibrary *fi, WinResource *wr, char *id)
+find_with_resource_array(WinLibrary *fi, WinResource *wr, const char *id)
 {
 	int c, rescnt;
 	WinResource *return_wr;
@@ -528,7 +539,7 @@ find_with_resource_array(WinLibrary *fi, WinResource *wr, char *id)
 }
 
 WinResource *
-find_resource (WinLibrary *fi, char *type, char *name, char *language, int *level)
+find_resource (WinLibrary *fi, const char *type, const char *name, const char *language, int *level)
 {
 	WinResource *wr;
 

@@ -28,18 +28,18 @@
 #include "fileread.h"
 #include "wrestool.h"
 
-static void *extract_group_icon_cursor_resource(WinLibrary *, WinResource *, char *, int *, bool);
-static void *extract_bitmap_resource(WinLibrary *, WinResource *, int *);
+static void *extract_group_icon_cursor_resource(WinLibrary *, WinResource *, char *, size_t *, bool);
+static void *extract_bitmap_resource(WinLibrary *, WinResource *, size_t *);
 
 void
 extract_resources_callback (WinLibrary *fi, WinResource *wr,
                             WinResource *type_wr, WinResource *name_wr,
                             WinResource *lang_wr)
 {
-	int size;
+	size_t size;
 	bool free_it;
 	void *memory;
-	char *outname;
+	const char *outname;
 	FILE *out;
 
 	memory = extract_resource(fi, wr, &size, &free_it, type_wr->id, (lang_wr == NULL ? NULL : lang_wr->id), arg_raw);
@@ -75,7 +75,7 @@ extract_resources_callback (WinLibrary *fi, WinResource *wr,
  *   Extract a resource, returning pointer to data.
  */
 void *
-extract_resource (WinLibrary *fi, WinResource *wr, int *size,
+extract_resource (WinLibrary *fi, WinResource *wr, size_t *size,
                   bool *free_it, char *type, char *lang, bool raw)
 {
 	char *str;
@@ -123,12 +123,13 @@ extract_resource (WinLibrary *fi, WinResource *wr, int *size,
  */
 static void *
 extract_group_icon_cursor_resource(WinLibrary *fi, WinResource *wr, char *lang,
-                                   int *ressize, bool is_icon)
+                                   size_t *ressize, bool is_icon)
 {
 	Win32CursorIconDir *icondir;
 	Win32CursorIconFileDir *fileicondir;
 	char *memory;
-	int c, size, offset, skipped;
+	int c, offset, skipped;
+	size_t size;
 
 	/* get resource data and size */
 	icondir = (Win32CursorIconDir *) get_resource_entry(fi, wr, &size);
@@ -142,7 +143,7 @@ extract_group_icon_cursor_resource(WinLibrary *fi, WinResource *wr, char *lang,
 	skipped = 0;
 	for (c = 0 ; c < icondir->count ; c++) {
 		int level;
-	    	int iconsize;
+		size_t iconsize;
 		char name[14];
 		WinResource *fwr;
 
@@ -237,13 +238,15 @@ extract_group_icon_cursor_resource(WinLibrary *fi, WinResource *wr, char *lang,
 		fileicondir->entries[c-skipped].dib_offset = offset;
 
 		/* transfer resource into file memory */
+		if (size > icondir->entries[c-skipped].bytes_in_res)
+			size = icondir->entries[c-skipped].bytes_in_res;
 		if (is_icon) {
-			memcpy(&memory[offset], data, icondir->entries[c].bytes_in_res);
-		} else {
+			memcpy(&memory[offset], data, size);
+		} else if (size >= sizeof(uint16_t)*2) {
 			fileicondir->entries[c-skipped].hotspot_x = ((uint16_t *) data)[0];
 			fileicondir->entries[c-skipped].hotspot_y = ((uint16_t *) data)[1];
 			memcpy(&memory[offset], data+sizeof(uint16_t)*2,
-				   icondir->entries[c].bytes_in_res-sizeof(uint16_t)*2);
+				   size-sizeof(uint16_t)*2);
 			offset -= sizeof(uint16_t)*2;
 		}
 
@@ -263,13 +266,13 @@ extract_group_icon_cursor_resource(WinLibrary *fi, WinResource *wr, char *lang,
  *   the returned memory block will be placed.
  */
 static void *
-extract_bitmap_resource(WinLibrary *fi, WinResource *wr, int *ressize)
+extract_bitmap_resource(WinLibrary *fi, WinResource *wr, size_t *ressize)
 {
     Win32BitmapInfoHeader info;
     uint8_t *result;
     uint8_t *resentry;
     uint32_t offbits;
-    int size;
+    size_t size;
 
     resentry=(uint8_t *)(get_resource_entry(fi,wr,&size));
 
