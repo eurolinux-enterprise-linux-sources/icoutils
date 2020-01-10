@@ -1,6 +1,6 @@
 Name:           icoutils
 Version:        0.31.0
-Release:        1%{?dist}
+Release:        3%{?dist}
 Summary:        Utility for extracting and converting Microsoft icon and cursor files
 
 Group:          Applications/Multimedia
@@ -52,6 +52,12 @@ make install DESTDIR=%{buildroot}
 
 
 %changelog
+* Fri Jan 24 2014 Daniel Mach <dmach@redhat.com> - 0.31.0-3
+- Mass rebuild 2014-01-24
+
+* Fri Dec 27 2013 Daniel Mach <dmach@redhat.com> - 0.31.0-2
+- Mass rebuild 2013-12-27
+
 * Mon Jun 17 2013 Martin Gieseking <martin.gieseking@uos.de> 0.31.0-1
 - Updated to version 0.31.0.
 - Dropped patches as they have been applied upstream.
